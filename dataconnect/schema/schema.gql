@@ -1,0 +1,57 @@
+type User @table {
+  id: String! @default(expr: "auth.uid") # User ID type is String
+  displayName: String!
+  createdAt: Timestamp!
+  email: String
+  photoUrl: String
+}
+
+type Comic @table {
+  id: UUID! @default(expr: "uuidV4()") # Comic ID type is UUID
+  title: String!
+  issueNumber: Int!
+  publisher: String!
+  createdAt: Timestamp!
+  series: String
+  publicationDate: Date
+  coverArtist: String
+  writer: String
+  description: String
+}
+
+type UserComic @table(key: ["comicId", "userId"]) {
+  comicId: UUID!  # This holds the ID of the Comic (matches Comic.id type)
+  userId: String! # This holds the ID of the User (matches User.id type)
+
+  # When referencing Comic, its primary key field is "id".
+  # Data Connect will implicitly map UserComic.comicId to Comic.id.
+  comic: Comic! @ref(references: ["id"]) # FIX: Changed to "id"
+  # When referencing User, its primary key field is "id".
+  # Data Connect will implicitly map UserComic.userId to User.id.
+  user: User! @ref(references: ["id"])   # FIX: Changed to "id"
+
+  # ... any other fields specific to the UserComic relationship ...
+}
+
+type Scan @table {
+  id: UUID! @default(expr: "uuidV4()")
+
+  # These local fields in Scan will hold the IDs required
+  # to uniquely identify a UserComic entry.
+  # Their types now match the respective primary keys of Comic and User.
+  scanComicId: UUID!
+  scanUserId: String!
+
+  # When referencing UserComic, its primary key components are "comicId" and "userId".
+  # Data Connect will implicitly map Scan.scanComicId to UserComic.comicId
+  # and Scan.scanUserId to UserComic.userId.
+  userComic: UserComic! @ref(references: ["comicId", "userId"]) # FIX: Changed to "comicId", "userId"
+}
+
+type GradingFeedback @table {
+  id: UUID! @default(expr: "uuidV4()")
+  scan: Scan!
+  feedbackDate: Timestamp!
+  userProvidedGrade: Float!
+  notes: String
+}
