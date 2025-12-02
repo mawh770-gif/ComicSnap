@@ -1,4 +1,5 @@
 // src/App.jsx
+// Forcing redeploy V12-02-25 17:12
 import React from 'react';
 import { useAuth } from './context/AuthContext';
 import Scanner from './components/Scanner'; 
