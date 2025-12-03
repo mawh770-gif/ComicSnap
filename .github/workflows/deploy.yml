@@ -1,0 +1,52 @@
+name: Deploy to Firebase on Push
+
+on:
+  push:
+    branches:
+      - master # Triggers the workflow whenever code is pushed to the 'master' branch
+
+jobs:
+  build_and_deploy:
+    name: Build, Test, and Deploy
+    runs-on: ubuntu-latest
+    env:
+      NODE_VERSION: '20' 
+      PROJECT_ID: comicsnap-af94c # Define Project ID once
+      
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      # --- 1. SETUP NODE AND DEPENDENCIES ---
+      - name: 🛠️ Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          
+      - name: 📦 Install Frontend Dependencies
+        run: npm install
+
+      - name: ⚙️ Install Functions Dependencies
+        # Assumes your functions directory is named 'functions'
+        run: npm install
+        working-directory: functions
+
+      # --- 2. BUILD APPLICATION ---
+      - name: 🏗️ Build Frontend (React)
+        run: npm run build
+        
+      # --- 3. AUTHENTICATION & DEPLOYMENT (Future-Proof Method) ---
+      
+      - name: 🔐 Authenticate Service Account
+        # Uses the official Google Auth action to securely use the JSON key
+        uses: google-github-actions/auth@v2
+        with:
+          # Your Service Account JSON key from the GitHub Secret
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🚀 Deploy Hosting and Functions
+        # Use the standard Firebase CLI for deployment
+        run: npx firebase deploy --only hosting,functions --project ${{ env.PROJECT_ID }}
+        env:
+          # This variable automatically points the CLI to the authenticated service account
+          GCLOUD_PROJECT: ${{ env.PROJECT_ID }}
