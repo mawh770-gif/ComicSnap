@@ -9,12 +9,10 @@ import { httpsCallable } from 'firebase/functions';
 const callMetadataFunction = httpsCallable(functions, 'fetchComicMetadata');
 
 /**
- * Saves a new comic entry into the user's Firestore inventory.
- * @param {string} userId - The authenticated user's ID.
- * @param {object} data - Contains barcodeData, metadata, and userInputs.
+ * Helper function to save a document to a specified collection.
+ * This handles the common logic for both inventory and staging.
  */
-export const addComicToInventory = async (userId, data) => {
-    
+const saveComicDocument = async (userId, data, collectionPath) => {
     // Prepare the base data structure for Firestore
     const comicDocument = {
         uid: userId,
@@ -48,15 +46,35 @@ export const addComicToInventory = async (userId, data) => {
         comicDocument.creators = data.metadata.creators;
     }
 
-    // 2. Save the complete document to the user's inventory subcollection
+    // 2. Save the complete document to the user's subcollection
     try {
-        const docRef = await addDoc(collection(db, 'users', userId, 'inventory'), comicDocument);
+        const docRef = await addDoc(collection(db, 'users', userId, collectionPath), comicDocument);
         return { success: true, id: docRef.id };
     } catch (e) {
-        console.error("Error adding document: ", e);
+        console.error(`Error adding document to ${collectionPath}: `, e);
         return { success: false, error: e };
     }
+}
+
+
+/**
+ * Saves a new comic entry into the user's main Firestore inventory.
+ * @param {string} userId - The authenticated user's ID.
+ * @param {object} data - Contains barcodeData, metadata, and userInputs.
+ */
+export const addComicToInventory = async (userId, data) => {
+    return saveComicDocument(userId, data, 'inventory');
 };
+
+/**
+ * Saves a new comic entry into the user's STAGING area for review (typically for AI recognized items).
+ * @param {string} userId - The authenticated user's ID.
+ * @param {object} data - Contains barcodeData, metadata, and userInputs.
+ */
+export const addComicToStaging = async (userId, data) => {
+    return saveComicDocument(userId, data, 'staging');
+};
+
 
 /**
  * Calls the secure Firebase Cloud Function endpoint for metadata lookup.
@@ -74,4 +92,15 @@ export const fetchMetadataFromCloud = async (titleCode, issueNumber) => {
         // This catches HttpsErrors (internal, unauthenticated, invalid-argument)
         return { status: 'error', message: error.message }; 
     }
+};
+
+/**
+ * Legacy wrapper for the function that calls the secure Firebase Cloud Function endpoint.
+ * This is used to resolve the build error from components referencing the old name (processImageForMetadata).
+ * @deprecated Use fetchMetadataFromCloud instead.
+ */
+export const processImageForMetadata = async (imageDataPlaceholder) => {
+    console.warn("processImageForMetadata is deprecated. Using fetchMetadataFromCloud instead.");
+    // NOTE: This function's AI logic is a placeholder, so we return a clear error/stub.
+    return { status: 'error', message: "AI recognition is a placeholder function." };
 };
