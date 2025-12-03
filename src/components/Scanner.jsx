@@ -176,7 +176,7 @@ const Scanner = () => {
         </button>
       </div>
 
-      {/* STEP 1: INPUT BASED ON MODE */}
+{/* STEP 1: INPUT BASED ON MODE */}
       {!scannedComicData && (
         <div style={{ marginBottom: '20px', border: '1px solid #ddd', padding: '15px' }}>
           {mode === 'barcode' ? (
@@ -184,6 +184,43 @@ const Scanner = () => {
               <h4>Scan Barcode (Newstand/Direct Barcode)</h4>
               <input 
                 type="text"
-                placeholder="Enter full 17-digit barcode" 
+                placeholder="Enter full 17-digit barcode"
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value)}
+              />
+              
+              <div style={{ margin: '10px 0' }}>
+                <input
+                  type="checkbox"
+                  id="directBarcode"
+                  checked={isDirectBarcode}
+                  onChange={(e) => setIsDirectBarcode(e.target.checked)}
+                />
+                <label htmlFor="directBarcode" style={{ marginLeft: '5px' }}>
+                  **Barcode has "DIRECT EDITION" text**
+                </label>
+              </div>
+              
+              <button onClick={handleBarcodeScan} disabled={!inputCode}>
+                Scan & Lookup
+              </button>
+            </div>
+          ) : (
+            <div>
+              <h4>Upload Cover (Direct Edition Review)</h4>
+              <input 
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files[0])}
+              />
+              <button onClick={handleImageRecognition} disabled={!imageFile}>
+                Run AI & Lookup
+              </button>
+              <p style={{ marginTop: '5px', fontSize: 'small', color: 'gray' }}>
+                AI recognized comics go to staging for review.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+// END REPLACEMENT BLOCK
