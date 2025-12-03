@@ -26,4 +26,5 @@ const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
 
 // 4. Export them for use in App.jsx and AuthContext
-export { auth, db, storage, googleProvider };
+// ✅ CRITICAL CHANGE: Exporting 'app' is necessary for comicService.js to initialize Cloud Functions.
+export { auth, db, storage, googleProvider, app };

@@ -1,9 +1,12 @@
 // src/services/comicService.js
 
-import { db, functions } from '../firebase';
+import { db, app } from '../firebase'; // <--- FIXED: Import 'app' instead of the unexported 'functions'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 // 👇 CRITICAL: Used to call the secure Firebase Cloud Function
-import { httpsCallable } from 'firebase/functions'; 
+import { getFunctions, httpsCallable } from 'firebase/functions'; 
+
+// 🆕 NEW: Initialize the functions service locally using the imported 'app'
+const functions = getFunctions(app);
 
 // Reference to the Cloud Function endpoint we defined in index.js
 const callMetadataFunction = httpsCallable(functions, 'fetchComicMetadata');
