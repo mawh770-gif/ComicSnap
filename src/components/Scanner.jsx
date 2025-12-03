@@ -183,7 +183,7 @@ const Scanner = () => {
             <div>
               <h4>Scan Barcode (Newstand/Direct Barcode)</h4>
               <input 
-                type="text" 
+                type="text"
                 placeholder="Enter full 17-digit barcode" 
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value)}
