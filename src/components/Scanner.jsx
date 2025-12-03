@@ -74,7 +74,7 @@ const Scanner = () => {
     // PLACEMAKER: Conversion/Upload logic needed here
     const imageDataPlaceholder = "base64_encoded_image_or_url"; 
     
-    // NOTE: This call relies on the processImageForMetadata wrapper we fixed earlier
+    // NOTE: This call relies on the processImageForMetadata wrapper we fixed earlier
     const result = await processImageForMetadata(imageDataPlaceholder); 
 
     let metadata = null;
@@ -106,7 +106,7 @@ const Scanner = () => {
     
     setStatus('Finalizing save...');
 
-    // Determine save location based on the imageSource tag added above
+    // Determine save location based on the imageSource tag added above
     const isAIRecognition = scannedComicData.metadata?.details.imageSource === 'AI_RECOGNITION';
     const saveFunction = isAIRecognition ? addComicToStaging : addComicToInventory; 
     const collectionName = isAIRecognition ? 'staging' : 'inventory';
@@ -156,4 +156,35 @@ const Scanner = () => {
 
   return (
     <div style={{ padding: '20px' }}>
-      <button onClick={
+      <button onClick={handleSignOut} style={{ float: 'right', backgroundColor: 'red', color: 'white' }}>Log Out</button>
+      <h2>Comic Inventory Scanner</h2>
+      <p>Logged in as: {currentUser.email}</p> 
+      
+      {/* MODE TOGGLE */}
+      <div style={{ marginBottom: '15px' }}>
+        <button 
+          onClick={() => { setMode('barcode'); setScannedComicData(null); setStatus(''); }}
+          style={{ backgroundColor: mode === 'barcode' ? 'green' : 'gray', color: 'white' }}
+        >
+          Barcode Scan
+        </button>
+        <button 
+          onClick={() => { setMode('image'); setScannedComicData(null); setStatus(''); }}
+          style={{ backgroundColor: mode === 'image' ? 'green' : 'gray', color: 'white', marginLeft: '10px' }}
+        >
+          AI Image Recognition
+        </button>
+      </div>
+
+      {/* STEP 1: INPUT BASED ON MODE */}
+      {!scannedComicData && (
+        <div style={{ marginBottom: '20px', border: '1px solid #ddd', padding: '15px' }}>
+          {mode === 'barcode' ? (
+            <div>
+              <h4>Scan Barcode (Newstand/Direct Barcode)</h4>
+              <input 
+                type="text" 
+                placeholder="Enter full 17-digit barcode" 
+                value={inputCode}
+                onChange={(e) => setInputCode(e.target.value)}
+              />
