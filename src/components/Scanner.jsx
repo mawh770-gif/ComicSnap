@@ -187,4 +187,3 @@ const Scanner = () => {
                 placeholder="Enter full 17-digit barcode" 
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value)}
-              />
