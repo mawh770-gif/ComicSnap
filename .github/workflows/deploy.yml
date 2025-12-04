@@ -27,7 +27,7 @@ jobs:
         run: npm install
 
       - name: ⚙️ Install Functions Dependencies
-        # Assumes your functions directory is named 'functions'
+        # This assumes your functions directory is named 'functions'
         run: npm install
         working-directory: functions
 
@@ -35,18 +35,24 @@ jobs:
       - name: 🏗️ Build Frontend (React)
         run: npm run build
         
-      # --- 3. AUTHENTICATION & DEPLOYMENT (Future-Proof Method) ---
-      
+      # --- 3. AUTHENTICATION & FIREBASE CLI SETUP ---
+
+      - name: ⬇️ Install Firebase CLI
+        # 🟢 FIX for 'firebase: command not found' error (Exit Code 127)
+        # Installs the CLI globally so it's available in the PATH for the deploy command.
+        run: npm install -g firebase-tools
+
       - name: 🔐 Authenticate Service Account
-        # Uses the official Google Auth action to securely use the JSON key
+        # 🟢 FIX for 'Failed to authenticate' error (Future-Proofing)
+        # Uses the secure Service Account JSON key stored in your GitHub secret.
         uses: google-github-actions/auth@v2
         with:
-          # Your Service Account JSON key from the GitHub Secret
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # --- 4. DEPLOYMENT ---
+      
       - name: 🚀 Deploy Hosting and Functions
-        # FIXED: Removed 'npx' prefix. The environment will execute the globally available 'firebase' command.
+        # Runs the command directly. It now finds 'firebase' because it was installed globally.
         run: firebase deploy --only hosting,functions --project ${{ env.PROJECT_ID }}
         env:
-          # This variable automatically points the CLI to the authenticated service account
           GCLOUD_PROJECT: ${{ env.PROJECT_ID }}
