@@ -3,6 +3,7 @@
 // Import necessary modules for Cloud Functions and external API call
 const functions = require('firebase-functions');
 const fetch = require('node-fetch');
+const admin = require('firebase-admin'); // Must be imported here for FieldValue.serverTimestamp()
 // seriesCodeMap is now a fallback, but we keep it
 const { seriesCodeMap } = require('./seriesCodeMap'); 
 const { publisherCodeMap } = require('./publisherCodeMap');
@@ -12,7 +13,7 @@ const SERIES_MAPPINGS_COLLECTION = 'series_mappings';
 
 /**
  * Fetches and processes metadata for a comic issue based on barcode components.
- * * @param {object} db - The Firestore database handle from admin.firestore(). <--- NEW PARAMETER
+ * * @param {object} db - The Firestore database handle from admin.firestore().
  * @param {string} titleCode - The 5-digit title code from the UPC (e.g., "00102").
  * @param {number} issueNumber - The issue number (e.g., 1).
  * @param {string} coverVariant - The cover variant ('A', 'B', or 'D0' for Direct).
@@ -29,6 +30,8 @@ exports.fetchMetadataLogic = async (db, titleCode, issueNumber, coverVariant) =>
     let seriesTitleLookup = null; // Will be set by Firestore, local map, or API
 
     // --- 2. FIRESTORE CACHE CHECK (NEW) ---
+    // Note: We need admin imported globally (in index.js) but must reference 
+    // it for FieldValue in step 6 if not imported directly here.
     try {
         const cacheDocRef = db.collection(SERIES_MAPPINGS_COLLECTION).doc(titleCode);
         const cacheSnapshot = await cacheDocRef.get();
@@ -86,17 +89,16 @@ exports.fetchMetadataLogic = async (db, titleCode, issueNumber, coverVariant) =>
         const cvResult = data.results[0];
         
         // --- 6. CACHING SUCCESSFUL API LOOKUP (NEW) ---
-        // If the title was NOT found in the initial cache check, and the API returned a good result, 
-        // save the mapping so we skip the API call next time.
-        if (!cacheSnapshot.exists) {
+        // Note: For FieldValue.serverTimestamp() to work, 'admin' must be accessible.
+        // We'll trust it's imported correctly in index.js and use the object provided there.
+        if (!cacheSnapshot || !cacheSnapshot.exists) {
             const cacheDocRef = db.collection(SERIES_MAPPINGS_COLLECTION).doc(titleCode);
             await cacheDocRef.set({
                 series_title: seriesTitleLookup,
                 volume_id: cvResult.volume.id,
                 date_cached: admin.firestore.FieldValue.serverTimestamp(),
                 source: 'API_DISCOVERY'
-            }, { merge: true }); // Use merge to avoid overwriting the whole document if it already exists
-            // console.log(`Successfully cached title code ${titleCode} to Firestore.`);
+            }, { merge: true });
         }
         
         // --- 7. DATA PROCESSING AND SKU GENERATION ---
@@ -113,7 +115,11 @@ exports.fetchMetadataLogic = async (db, titleCode, issueNumber, coverVariant) =>
         }
         
         // Lookup Publisher Name
-        const publisherName = publisherCodeMap[cvResult.volume.publisher.id] || cvResult.volume.publisher.name || "Unknown Publisher";
+        // 🚨 CRITICAL CHANGE HERE: Access the .name property of the object
+        const publisherLookupResult = publisherCodeMap[cvResult.volume.publisher.id];
+        const publisherName = publisherLookupResult 
+            ? publisherLookupResult.name // Use the name from the local map object
+            : cvResult.volume.publisher.name || "Unknown Publisher"; // Fallback to CV API result
 
         // --- 8. TITLE FORMATTING (Newstand Rule) ---
         let finalSeriesTitle = seriesTitleLookup; 
