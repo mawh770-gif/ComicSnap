@@ -1,1 +1,38 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta name="description" content="ComicSnap AI Inventory and Grading System"/><link rel="apple-touch-icon" href="/logo192.png"/><link rel="manifest" href="/manifest.json"/><title>ComicSnap AI Inventory</title><script src="https://cdn.tailwindcss.com"></script><style>#root{min-height:100vh}</style><script defer="defer" src="/static/js/main.9822964d.js"></script></head><body class="bg-gray-900"><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comic Scan Pro</title>
+    <!-- Load Tailwind CSS from CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Apply the Inter font globally */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc; /* Light gray background */
+        }
+    </style>
+</head>
+<body>
+    <!-- 
+        The main container where React will inject the application. 
+        All components from src/App.jsx will be rendered inside here.
+    -->
+    <div id="root">
+        <!-- Optional Loading Message while React mounts -->
+        <div class="min-h-screen flex items-center justify-center">
+            <div class="text-xl text-emerald-600 font-semibold animate-pulse">
+                Loading Comic Scan Pro...
+            </div>
+        </div>
+    </div>
+
+    <!-- 
+        CRITICAL: Import the bundled application entry point. 
+        The build.sh script compiles src/index.jsx into this file.
+    -->
+    <script type="module" src="./index-module.js"></script>
+</body>
+</html>

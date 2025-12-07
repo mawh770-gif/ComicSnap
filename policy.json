@@ -1,0 +1,11 @@
+{
+  "rules": [
+    {
+      "tagState": "ANY",
+      "keep": {
+        "days": 90
+      },
+      "deleteMode": "ALWAYS"
+    }
+  ]
+}

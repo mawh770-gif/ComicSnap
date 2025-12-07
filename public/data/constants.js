@@ -1,8 +1,9 @@
-// Folder: src/data
-// File: constants.js
-// Version: 1.2
-// Date: December 7, 2025
+// src/data/constants.js
 
+/**
+ * Detailed professional grading scale for comic books.
+ * Used for user input dropdowns (value is stored, label is displayed).
+ */
 export const COMIC_GRADES = [
     { value: 'Unassigned', label: 'Unassigned Grade' },
     { value: '10.0', label: '10.0 Gem Mint (GM)' },
@@ -33,11 +34,19 @@ export const COMIC_GRADES = [
     { value: '0.1', label: '0.1 Incomplete (INC)' },
 ];
 
+/**
+ * System-specific variant codes used to trigger specific metadata logic.
+ */
 export const VARIANT_CODES = {
+    // D0 is the special code for Direct Market Editions (either barcode-less or with Direct text)
     'D0': 'Direct Edition',
 };
 
+/**
+ * Default values for initializing a new comic entry.
+ */
 export const DEFAULT_COMIC_INPUTS = {
+    // Set default grade to the string value '9.4' from the COMIC_GRADES array of objects
     condition_grade: '9.4', 
     my_value: '',
     storage_box: 'Unsorted'

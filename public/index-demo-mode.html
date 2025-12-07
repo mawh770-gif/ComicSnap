@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComicSnap Metadata Lookup</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a cleaner UI */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            max-width: 800px;
+        }
+        /* Custom class for highlighting a 'frame' or section */
+        .highlight-frame {
+            border: 3px solid #3b82f6; /* Tailwind blue-500 */
+            background-color: #eff6ff; /* Tailwind blue-50 */
+            transition: all 0.3s ease-in-out;
+            padding: 1.5rem; /* Match p-6 from container */
+            border-radius: 1rem; /* Match rounded-2xl from container */
+            margin-top: 1rem; /* Adjust margin */
+        }
+        /* Style to ensure smooth transition out */
+        #metadata-result {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-start justify-center p-4">
+    <div id="app" class="container w-full bg-white shadow-xl rounded-2xl p-6 md:p-8 mt-10">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">ComicSnap Lookup Client</h1>
+        <p class="text-sm text-gray-500 mb-6">Test both manual lookup (barcode style) and AI image analysis.</p>
+
+        <!-- Loading & Status Message -->
+        <div id="status-message" class="hidden p-3 mb-4 text-sm rounded-lg bg-yellow-100 text-yellow-700 font-medium" role="alert">
+            Waiting for Authentication...
+        </div>
+
+        <!-- Interface Sections -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- 1. Manual Barcode Lookup -->
+            <div class="border border-gray-200 rounded-xl p-4 space-y-4 shadow-sm bg-white">
+                <h2 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-2">Manual Lookup (Barcode)</h2>
+                <form id="metadata-form" class="space-y-4">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label for="title-code" class="block text-xs font-medium text-gray-700">Title Code</label>
+                            <input type="text" id="title-code" value="00102" required 
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500" 
+                                placeholder="e.g., 00102">
+                        </div>
+                        <div>
+                            <label for="issue-number" class="block text-xs font-medium text-gray-700">Issue #</label>
+                            <input type="number" id="issue-number" value="1" required 
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500" 
+                                placeholder="e.g., 1">
+                        </div>
+                        <div>
+                            <label for="cover-variant" class="block text-xs font-medium text-gray-700">Variant</label>
+                            <input type="text" id="cover-variant" value="A" 
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500" 
+                                placeholder="e.g., A, D0">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="lookup-button" disabled
+                            class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span id="button-text">Authenticate to Lookup Metadata</span>
+                        <svg id="loading-spinner-manual" class="animate-spin -ml-1 mr-3 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+
+            <!-- 2. AI Image Analysis -->
+            <div class="border border-gray-200 rounded-xl p-4 space-y-4 shadow-sm bg-white">
+                <h2 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-2">AI Image Analysis</h2>
+                <form id="image-form" class="space-y-4">
+                    <label for="image-upload" class="block text-sm font-medium text-gray-700">Upload Comic Cover (JPG/PNG)</label>
+                    <input type="file" id="image-upload" accept="image/jpeg, image/png" required
+                           class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+
+                    <button type="submit" id="analyze-button" disabled
+                            class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span id="analyze-button-text">Authenticate to Analyze Image</span>
+                        <svg id="loading-spinner-ai" class="animate-spin -ml-1 mr-3 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+                </form>
+                
+                <!-- Image Preview -->
+                <div id="image-preview-container" class="mt-4 border border-gray-100 p-2 rounded-lg hidden">
+                    <p class="text-xs text-gray-500 mb-1">Preview:</p>
+                    <img id="image-preview" class="max-h-48 w-auto mx-auto rounded-lg shadow-md" alt="Image Preview">
+                </div>
+            </div>
+        </div>
+
+        <!-- Metadata Result Display -->
+        <div id="metadata-result" class="mt-8 pt-6 border-t border-gray-200">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-700">Results</h2>
+                <button id="highlight-button" disabled
+                        class="px-3 py-1 text-xs font-medium rounded-full text-white bg-blue-500 hover:bg-blue-600 transition duration-150 disabled:opacity-50">
+                    Toggle Highlight
+                </button>
+            </div>
+            <div id="results-content" class="space-y-3">
+                <p class="text-gray-500 italic">Metadata will appear here after a successful lookup.</p>
+            </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-gray-100">
+            <p class="text-xs text-gray-400">Current User ID: <span id="user-id">N/A</span></p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Imports and Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; 
+
+        setLogLevel('debug'); 
+
+        // ----------------------------------------------------------------------
+        // 🛑 CRITICAL: PASTE YOUR FIREBASE CONFIGURATION HERE 🛑
+        // ----------------------------------------------------------------------
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const MANUAL_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyALrwf4LpQO2R8bTfcrnK04fHhRj0I1Yx8",
+            authDomain: "comicsnap-af94c.firebaseapp.com",
+            projectId: "comicsnap-af94c",
+            storageBucket: "comicsnap-af94c.firebasestorage.app",
+            messagingSenderId: "106369788670",
+            appId: "1:106369788670:web:880d3b8b304c67f29193af",
+            measurementId: "G-5PGQ6JMSM7"
+        };
+        // ----------------------------------------------------------------------
+
+        // --- GLOBAL VARIABLES SETUP ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config.length > 2)
+            ? JSON.parse(__firebase_config)
+            : MANUAL_FIREBASE_CONFIG; 
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- INITIALIZE FIREBASE SERVICES ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const functions = getFunctions(app, 'us-central1'); 
+        const db = getFirestore(app); 
+        
+        let userId = null;
+        let isDemoMode = false; // Flag to track if we are in Test/Simulation mode
+
+        // UI Elements (Manual Lookup)
+        const lookupButton = document.getElementById('lookup-button');
+        const buttonText = document.getElementById('button-text');
+        const loadingSpinnerManual = document.getElementById('loading-spinner-manual');
+        const metadataForm = document.getElementById('metadata-form');
+
+        // UI Elements (Image Analysis)
+        const analyzeButton = document.getElementById('analyze-button');
+        const analyzeButtonText = document.getElementById('analyze-button-text');
+        const loadingSpinnerAI = document.getElementById('loading-spinner-ai');
+        const imageForm = document.getElementById('image-form');
+        const imageUpload = document.getElementById('image-upload');
+        const imagePreview = document.getElementById('image-preview');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+
+        // General UI Elements
+        const highlightButton = document.getElementById('highlight-button');
+        const statusMessage = document.getElementById('status-message');
+        const resultsContent = document.getElementById('results-content');
+        const metadataResult = document.getElementById('metadata-result'); 
+        
+        // --- AUTHENTICATION ---
+
+        const authenticateUser = async () => {
+            statusMessage.textContent = 'Attempting sign-in...';
+            statusMessage.classList.remove('hidden');
+            
+            // 1. Attempt Custom Token Sign-in
+            if (initialAuthToken) {
+                try {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Successfully signed in with Custom Token.");
+                    isDemoMode = false;
+                } catch (error) {
+                    console.error("Custom Token Sign-in Failed:", error);
+                    // If the token is invalid, we can fall back to demo mode for testing UI
+                    enableDemoMode("Token invalid. Entering Demo Mode.");
+                }
+            } else {
+                // 2. NO TOKEN - Fallback to Demo Mode (Since Anonymous Auth is removed)
+                enableDemoMode("No environment token. Running in Test/Demo Mode.");
+            }
+        };
+
+        const enableDemoMode = (msg) => {
+            isDemoMode = true;
+            userId = "test-user-demo";
+            
+            // UI Updates for Demo Mode
+            document.getElementById('user-id').textContent = userId + " (Simulated)";
+            
+            lookupButton.disabled = false; 
+            analyzeButton.disabled = false;
+            buttonText.textContent = 'Lookup (Demo Mode)';
+            analyzeButtonText.textContent = 'Analyze (Demo Mode)';
+            
+            statusMessage.textContent = msg;
+            statusMessage.classList.remove('bg-yellow-100', 'text-yellow-700', 'bg-red-100', 'text-red-700');
+            statusMessage.classList.add('bg-blue-100', 'text-blue-700');
+            statusMessage.classList.remove('hidden');
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            // Only handle real users here. Demo users are handled in enableDemoMode
+            if (user) {
+                userId = user.uid;
+                document.getElementById('user-id').textContent = userId;
+                
+                lookupButton.disabled = false; 
+                analyzeButton.disabled = false;
+                buttonText.textContent = 'Lookup Metadata';
+                analyzeButtonText.textContent = 'Analyze Image';
+                
+                statusMessage.textContent = `Authenticated (Google Identity). ID: ${userId.substring(0, 8)}...`;
+                statusMessage.classList.remove('bg-yellow-100', 'text-yellow-700', 'hidden', 'bg-red-100', 'bg-blue-100');
+                statusMessage.classList.add('bg-green-100', 'text-green-700');
+            } else if (!isDemoMode) {
+                // Reset if not in demo mode
+                lookupButton.disabled = true;
+                analyzeButton.disabled = true;
+                highlightButton.disabled = true;
+                document.getElementById('user-id').textContent = 'N/A';
+            }
+        });
+
+        // Start authentication immediately
+        authenticateUser();
+
+        // --- MOCK DATA FOR DEMO MODE ---
+        const MOCK_METADATA = {
+            details: {
+                image_url: "https://upload.wikimedia.org/wikipedia/en/5/52/X-Men_1_Cover_2019.jpg", // Placeholder
+                series_title: "X-Men",
+                issue_number: "1",
+                publisher_name: "Marvel Comics",
+                release_date: "2019-10-16",
+                base_sku: "759606093938",
+                volume_id: "2019",
+                imageSource: "Simulated Data"
+            },
+            creators: {
+                writer: ["Jonathan Hickman"],
+                penciller: ["Leinil Francis Yu"],
+                colorist: ["Sunny Gho"]
+            }
+        };
+
+
+        // --- FIREBASE FUNCTION CALL LOGIC ---
+
+        // Helper to set loading state
+        function setLoading(isLoading, type = 'manual') {
+            const button = type === 'manual' ? lookupButton : analyzeButton;
+            const spinner = type === 'manual' ? loadingSpinnerManual : loadingSpinnerAI;
+            const textSpan = type === 'manual' ? buttonText : analyzeButtonText;
+            
+            // Determine default text based on mode
+            let defaultText = type === 'manual' ? 'Lookup Metadata' : 'Analyze Image';
+            if (isDemoMode) defaultText += ' (Demo Mode)';
+
+            button.disabled = isLoading || (!userId && !isDemoMode);
+            highlightButton.disabled = isLoading;
+            spinner.classList.toggle('hidden', !isLoading);
+            textSpan.textContent = isLoading ? 'Processing...' : defaultText;
+        }
+
+        // 1. Manual Barcode Lookup
+        const callMetadataFunction = async (e) => {
+            e.preventDefault();
+            
+            const titleCode = document.getElementById('title-code').value.trim();
+            const issueNumber = parseInt(document.getElementById('issue-number').value, 10);
+            
+            if (!titleCode || isNaN(issueNumber)) {
+                displayError("Please enter a valid Title Code and Issue Number.");
+                return;
+            }
+
+            setLoading(true, 'manual');
+            displayError(null); 
+            
+            try {
+                if (isDemoMode) {
+                    // SIMULATION: Wait 1s then return mock data
+                    await new Promise(r => setTimeout(r, 1000));
+                    const mockResponse = { data: { status: 'success', metadata: MOCK_METADATA } };
+                    mockResponse.data.metadata.details.imageSource = "Simulation (Demo Mode)";
+                    processFunctionResponse(mockResponse, 'Manual Lookup');
+                } else {
+                    // REAL CALL
+                    const fetchComicMetadata = httpsCallable(functions, 'fetchComicMetadata');
+                    const response = await callFunctionWithBackoff(fetchComicMetadata, {
+                        titleCode, issueNumber, coverVariant: document.getElementById('cover-variant').value.trim() || 'A'
+                    }, 3, 1000);
+                    processFunctionResponse(response, 'Manual Lookup');
+                }
+
+            } catch (error) {
+                console.error("Manual Lookup Error:", error);
+                displayError(`Lookup Failed: ${error.message}`);
+            } finally {
+                setLoading(false, 'manual');
+            }
+        };
+
+        metadataForm.addEventListener('submit', callMetadataFunction);
+
+
+        // 2. AI Image Analysis
+        const callImageAnalysisFunction = async (e) => {
+            e.preventDefault();
+            
+            const file = imageUpload.files[0];
+            if (!file) {
+                displayError("Please select an image file to analyze.");
+                return;
+            }
+            
+            setLoading(true, 'ai');
+            displayError(null); 
+            
+            try {
+                if (isDemoMode) {
+                    // SIMULATION: Wait 1.5s then return mock data
+                    await new Promise(r => setTimeout(r, 1500));
+                    const mockResponse = { data: { status: 'success', metadata: MOCK_METADATA } };
+                    mockResponse.data.metadata.details.imageSource = "AI Simulation (Demo Mode)";
+                    processFunctionResponse(mockResponse, 'AI Analysis');
+                } else {
+                    // REAL CALL
+                    const base64Image = await fileToBase64(file);
+                    const processImageForMetadata = httpsCallable(functions, 'processImageForMetadata');
+                    const response = await callFunctionWithBackoff(processImageForMetadata, {
+                        base64Image: base64Image.split(',')[1],
+                        imageMimeType: file.type
+                    }, 3, 1000);
+                    processFunctionResponse(response, 'AI Analysis');
+                }
+            } catch (error) {
+                console.error("AI Analysis Error:", error);
+                displayError(`Analysis Failed: ${error.message}`);
+            } finally {
+                setLoading(false, 'ai');
+            }
+        };
+        
+        imageForm.addEventListener('submit', callImageAnalysisFunction);
+
+
+        // --- GENERIC HELPERS ---
+
+        function processFunctionResponse(response, sourceName) {
+            if (response && response.data.status === 'success') {
+                const resultSource = response.data.metadata.details.imageSource;
+                displayMetadata(response.data.metadata, resultSource);
+            } else if (response) {
+                displayError(response.data.message || `An error occurred during ${sourceName}.`);
+            }
+        }
+
+        async function callFunctionWithBackoff(callable, data, maxRetries, initialDelay) {
+            let delay = initialDelay;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await callable(data);
+                } catch (error) {
+                    if (i < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // --- UI UTILITIES ---
+
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreviewContainer.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                 imagePreviewContainer.classList.add('hidden');
+            }
+        });
+
+        highlightButton.addEventListener('click', () => {
+             metadataResult.classList.toggle('highlight-frame');
+        });
+
+        function displayError(message) {
+            statusMessage.classList.add('hidden'); // Hide top status when showing result error
+            highlightButton.disabled = true;
+            if (message) {
+                resultsContent.innerHTML = `<div class="p-4 rounded-lg bg-red-100 text-red-700 font-medium">${message}</div>`;
+            } else if (resultsContent.innerHTML.includes('red-100')) {
+                 resultsContent.innerHTML = '<p class="text-gray-500 italic">Metadata will appear here after a successful lookup.</p>';
+            }
+        }
+
+        function displayMetadata(metadata, source) {
+            const details = metadata.details;
+            const creators = metadata.creators;
+            
+            highlightButton.disabled = false; 
+
+            const formatCreators = (role) => creators[role] && creators[role].length > 0
+                ? `<span class="font-normal text-gray-600">${creators[role].join(', ')}</span>`
+                : `<span class="font-normal text-gray-400">N/A</span>`;
+
+            resultsContent.innerHTML = `
+                <div class="flex flex-col md:flex-row gap-6">
+                    <!-- Image -->
+                    <div class="md:w-1/3">
+                        <img src="${details.image_url}" alt="${details.series_title} #${details.issue_number}" 
+                             class="rounded-lg shadow-lg w-full h-auto object-cover" 
+                             onerror="this.onerror=null;this.src='https://placehold.co/200x300/e5e7eb/7f8c8d?text=No+Image';">
+                        <p class="text-xs text-gray-400 text-center mt-2">Source: ${source}</p>
+                    </div>
+                    <!-- Details -->
+                    <div class="md:w-2/3 space-y-3">
+                        <h3 class="text-2xl font-bold text-indigo-700">${details.series_title} #${details.issue_number}</h3>
+                        <p class="text-lg text-gray-800 font-semibold">${details.publisher_name}</p>
+                        
+                        <hr class="border-gray-100">
+
+                        <div class="text-sm">
+                            <p><span class="font-medium text-gray-700">Release:</span> ${details.release_date || 'N/A'}</p>
+                            <p><span class="font-medium text-gray-700">SKU Base:</span> ${details.base_sku || 'N/A'}</p>
+                            <p><span class="font-medium text-gray-700">Volume ID:</span> ${details.volume_id || 'N/A'}</p>
+                        </div>
+                        
+                        <hr class="border-gray-100">
+
+                        <div class="text-sm space-y-1">
+                            <p class="font-medium text-gray-700">Writer: ${formatCreators('writer')}</p>
+                            <p class="font-medium text-gray-700">Penciller: ${formatCreators('penciller')}</p>
+                            <p class="font-medium text-gray-700">Colorist: ${formatCreators('colorist')}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

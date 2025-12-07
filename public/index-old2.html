@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComicSnap Metadata Client (Email Auth)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a cleaner UI */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .login-card {
+            max-width: 450px;
+        }
+        /* Custom class for highlighting a 'frame' or section */
+        .highlight-frame {
+            border: 3px solid #3b82f6; /* Tailwind blue-500 */
+            background-color: #eff6ff; /* Tailwind blue-50 */
+            transition: all 0.3s ease-in-out;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-start justify-center p-4">
+    <div id="app" class="container w-full shadow-xl rounded-2xl p-6 md:p-8 mt-10 transition-all duration-300">
+        <!-- Content will be swapped here by JavaScript (Login or Main App) -->
+    </div>
+
+    <!-- Firebase SDK Imports and Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; 
+
+        setLogLevel('debug'); 
+
+        // ----------------------------------------------------------------------
+        // 🛑 CRITICAL: FIREBASE CONFIGURATION (comicsnap-af94c) 🛑
+        // 🚨 IMPORTANT: This configuration is manually set for Email/Password Auth.
+        // ----------------------------------------------------------------------
+        const MANUAL_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyALrwf4LpQO2R8bTfcrnK04fHhRj0I1Yx8",
+            authDomain: "comicsnap-af94c.firebaseapp.com",
+            projectId: "comicsnap-af94c",
+            storageBucket: "comicsnap-af94c.firebasestorage.app",
+            messagingSenderId: "106369788670",
+            appId: "1:106369788670:web:880d3b8b304c67f29193af",
+            measurementId: "G-5PGQ6JMSM7"
+        };
+        // ----------------------------------------------------------------------
+
+        // --- GLOBAL VARIABLES SETUP ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config.length > 2)
+            ? JSON.parse(__firebase_config)
+            : MANUAL_FIREBASE_CONFIG; 
+
+        // --- INITIALIZE FIREBASE SERVICES ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const functions = getFunctions(app, 'us-central1'); 
+        const db = getFirestore(app); 
+        
+        let userId = null;
+        const appContainer = document.getElementById('app');
+
+        // --- UI Rendering Functions ---
+
+        /**
+         * Renders the main application view after successful authentication.
+         */
+        function renderMainApp(user) {
+            userId = user.uid;
+            
+            appContainer.classList.remove('login-card', 'mx-auto', 'p-4');
+            appContainer.classList.add('bg-white');
+            appContainer.innerHTML = `
+                <div class="flex justify-between items-center mb-6 border-b pb-4">
+                    <h1 class="text-3xl font-bold text-gray-800">ComicSnap Lookup Client</h1>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-gray-500 hidden md:block">User: ${user.email || 'N/A'}</span>
+                        <button id="logout-button" class="px-3 py-1 text-sm font-medium rounded-full text-white bg-red-500 hover:bg-red-600 transition duration-150">Log Out</button>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-500 mb-6">Test both manual lookup (barcode style) and AI image analysis.</p>
+
+                <!-- Status Message (for errors/successes) -->
+                <div id="status-message" class="hidden p-3 mb-4 text-sm rounded-lg" role="alert"></div>
+
+                <!-- Interface Sections -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 1. Manual Barcode Lookup -->
+                    <div class="border border-gray-200 rounded-xl p-4 space-y-4 shadow-sm bg-white">
+                        <h2 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-2">Manual Lookup (Barcode)</h2>
+                        <form id="metadata-form" class="space-y-4">
+                            <div class="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label for="title-code" class="block text-xs font-medium text-gray-700">Title Code</label>
+                                    <input type="text" id="title-code" value="00102" required 
+                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500" 
+                                        placeholder="e.g., 00102">
+                                </div>
+                                <div>
+                                    <label for="issue-number" class="block text-xs font-medium text-gray-700">Issue #</label>
+                                    <input type="number" id="issue-number" value="1" required 
+                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500" 
+                                        placeholder="e.g., 1">
+                                </div>
+                                <div>
+                                    <label for="cover-variant" class="block text-xs font-medium text-gray-700">Variant</label>
+                                    <input type="text" id="cover-variant" value="A" 
+                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500" 
+                                        placeholder="e.g., A, D0">
+                                </div>
+                            </div>
+                            <button type="submit" id="lookup-button"
+                                    class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out disabled:opacity-50">
+                                <span id="button-text">Lookup Metadata</span>
+                                <svg id="loading-spinner-manual" class="animate-spin -ml-1 mr-3 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- 2. AI Image Analysis -->
+                    <div class="border border-gray-200 rounded-xl p-4 space-y-4 shadow-sm bg-white">
+                        <h2 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-2">AI Image Analysis</h2>
+                        <form id="image-form" class="space-y-4">
+                            <label for="image-upload" class="block text-sm font-medium text-gray-700">Upload Comic Cover (JPG/PNG)</label>
+                            <input type="file" id="image-upload" accept="image/jpeg, image/png" required
+                                class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+
+                            <button type="submit" id="analyze-button"
+                                    class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50">
+                                <span id="analyze-button-text">Analyze Image</span>
+                                <svg id="loading-spinner-ai" class="animate-spin -ml-1 mr-3 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </button>
+                        </form>
+                        
+                        <!-- Image Preview -->
+                        <div id="image-preview-container" class="mt-4 border border-gray-100 p-2 rounded-lg hidden">
+                            <p class="text-xs text-gray-500 mb-1">Preview:</p>
+                            <img id="image-preview" class="max-h-48 w-auto mx-auto rounded-lg shadow-md" alt="Image Preview">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metadata Result Display -->
+                <div id="metadata-result" class="mt-8 pt-6 border-t border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-700">Results</h2>
+                        <button id="highlight-button" disabled
+                                class="px-3 py-1 text-xs font-medium rounded-full text-white bg-blue-500 hover:bg-blue-600 transition duration-150 disabled:opacity-50">
+                            Toggle Highlight
+                        </button>
+                    </div>
+                    <div id="results-content" class="space-y-3">
+                        <p class="text-gray-500 italic">Metadata will appear here after a successful lookup.</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-gray-100">
+                    <p class="text-xs text-gray-400">Current User ID: <span id="user-id">${userId}</span></p>
+                </div>
+            `;
+            
+            // Re-attach event listeners after DOM update
+            document.getElementById('logout-button').addEventListener('click', handleLogout);
+            document.getElementById('metadata-form').addEventListener('submit', callMetadataFunction);
+            document.getElementById('image-form').addEventListener('submit', callImageAnalysisFunction);
+            document.getElementById('image-upload').addEventListener('change', handleImageUpload);
+            document.getElementById('highlight-button').addEventListener('click', () => {
+                 document.getElementById('metadata-result').classList.toggle('highlight-frame');
+            });
+
+        }
+
+        /**
+         * Renders the login/signup form.
+         */
+        function renderLogin() {
+            appContainer.classList.remove('bg-white');
+            appContainer.classList.add('login-card', 'mx-auto', 'p-4');
+            appContainer.innerHTML = `
+                <div class="bg-white shadow-xl rounded-2xl p-6 md:p-8">
+                    <h1 class="text-2xl font-bold text-gray-800 text-center mb-4" id="auth-title">Sign In to ComicSnap</h1>
+                    <div id="auth-status" class="hidden p-3 mb-4 text-sm rounded-lg bg-yellow-100 text-yellow-700 font-medium" role="alert">
+                        Authentication required.
+                    </div>
+                    <form id="auth-form" class="space-y-4">
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" id="email" required 
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 text-sm border focus:ring-indigo-500 focus:border-indigo-500" 
+                                placeholder="you@example.com">
+                        </div>
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                            <input type="password" id="password" required 
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 text-sm border focus:ring-indigo-500 focus:border-indigo-500" 
+                                placeholder="********">
+                        </div>
+                        <p id="auth-error" class="text-sm text-red-500 text-center"></p>
+                        <button type="submit" id="auth-button"
+                                class="w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                            Sign In
+                        </button>
+                    </form>
+                    <p class="text-center mt-6 text-sm">
+                        <button id="toggle-auth-mode" class="font-medium text-indigo-600 hover:text-indigo-500">
+                            Need an account? Sign Up
+                        </button>
+                    </p>
+                </div>
+            `;
+
+            // Setup event listeners for the login form
+            let isLoginMode = true;
+            const authForm = document.getElementById('auth-form');
+            const toggleButton = document.getElementById('toggle-auth-mode');
+            const authTitle = document.getElementById('auth-title');
+            const authButton = document.getElementById('auth-button');
+
+            const updateUI = () => {
+                authTitle.textContent = isLoginMode ? 'Sign In to ComicSnap' : 'Create New Account';
+                authButton.textContent = isLoginMode ? 'Sign In' : 'Sign Up';
+                toggleButton.textContent = isLoginMode ? "Need an account? Sign Up" : "Already have an account? Sign In";
+            };
+
+            authForm.addEventListener('submit', (e) => handleAuthSubmit(e, isLoginMode));
+            toggleButton.addEventListener('click', () => {
+                isLoginMode = !isLoginMode;
+                document.getElementById('auth-error').textContent = '';
+                updateUI();
+            });
+
+            updateUI();
+        }
+
+
+        // --- Authentication Handlers ---
+
+        /**
+         * Handles the submission of the login/signup form.
+         */
+        async function handleAuthSubmit(e, isLoginMode) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorElement = document.getElementById('auth-error');
+            const authButton = document.getElementById('auth-button');
+            
+            errorElement.textContent = '';
+            authButton.disabled = true;
+
+            try {
+                if (isLoginMode) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                }
+                // Success: onAuthStateChanged will handle rendering the main app
+            } catch (error) {
+                console.error("Auth Error:", error);
+                let message = "An unknown error occurred.";
+                
+                if (error.code) {
+                    message = error.code.replace('auth/', '').replace(/-/g, ' ');
+                    message = message.charAt(0).toUpperCase() + message.slice(1);
+                } else if (error.message) {
+                    message = error.message;
+                }
+                
+                errorElement.textContent = `Error: ${message}`;
+                authButton.disabled = false;
+            }
+        }
+
+        /**
+         * Handles user logout.
+         */
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Logout Error:", error);
+                // NOTE: Use a modal/message box instead of alert()
+                document.getElementById('results-content').innerHTML = `<div class="p-4 rounded-lg bg-red-100 text-red-700 font-medium">Failed to log out. See console for details.</div>`;
+            }
+        }
+
+
+        // --- Core Application Logic (Auth State Change Listener) ---
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                renderMainApp(user);
+            } else {
+                renderLogin();
+            }
+        });
+
+
+        // --- FIREBASE FUNCTION CALL LOGIC (Remains the same but uses current user's ID) ---
+
+        // Helper to set loading state for either function
+        function setLoading(isLoading, type = 'manual') {
+            // Re-fetch elements as the DOM is re-rendered on auth state change
+            const lookupButton = document.getElementById('lookup-button');
+            const analyzeButton = document.getElementById('analyze-button');
+            const loadingSpinnerManual = document.getElementById('loading-spinner-manual');
+            const loadingSpinnerAI = document.getElementById('loading-spinner-ai');
+            const buttonText = document.getElementById('button-text');
+            const analyzeButtonText = document.getElementById('analyze-button-text');
+            const highlightButton = document.getElementById('highlight-button');
+
+            const button = type === 'manual' ? lookupButton : analyzeButton;
+            const spinner = type === 'manual' ? loadingSpinnerManual : loadingSpinnerAI;
+            const textSpan = type === 'manual' ? buttonText : analyzeButtonText;
+            const defaultText = type === 'manual' ? 'Lookup Metadata' : 'Analyze Image';
+
+            if (button && spinner && textSpan) {
+                button.disabled = isLoading || !userId;
+                if (highlightButton) highlightButton.disabled = isLoading;
+                spinner.classList.toggle('hidden', !isLoading);
+                textSpan.textContent = isLoading ? 'Processing...' : defaultText;
+            }
+        }
+
+        // 1. Manual Barcode Lookup Function (Calls fetchComicMetadata)
+        async function callMetadataFunction(e) {
+            e.preventDefault();
+            
+            const titleCode = document.getElementById('title-code').value.trim();
+            const issueNumber = parseInt(document.getElementById('issue-number').value, 10);
+            const coverVariant = document.getElementById('cover-variant').value.trim() || 'A';
+            
+            if (!titleCode || isNaN(issueNumber)) {
+                displayError("Please enter a valid Title Code and Issue Number.");
+                return;
+            }
+
+            setLoading(true, 'manual');
+            displayError(null); 
+            
+            try {
+                const fetchComicMetadata = httpsCallable(functions, 'fetchComicMetadata');
+                const response = await callFunctionWithBackoff(fetchComicMetadata, {
+                    titleCode: titleCode,
+                    issueNumber: issueNumber,
+                    coverVariant: coverVariant
+                }, 3, 1000);
+                
+                processFunctionResponse(response, 'Manual Lookup');
+
+            } catch (error) {
+                console.error("Manual Lookup Function Call Error:", error);
+                displayError(`Lookup Failed: ${error.message}. Check console for details.`);
+            } finally {
+                setLoading(false, 'manual');
+            }
+        }
+
+        // 2. AI Image Analysis Function (Calls processImageForMetadata)
+        async function callImageAnalysisFunction(e) {
+            e.preventDefault();
+            
+            const imageUpload = document.getElementById('image-upload');
+            const file = imageUpload.files[0];
+            if (!file) {
+                displayError("Please select an image file to analyze.");
+                return;
+            }
+            
+            setLoading(true, 'ai');
+            displayError(null); 
+            
+            try {
+                const base64Image = await fileToBase64(file);
+                
+                const processImageForMetadata = httpsCallable(functions, 'processImageForMetadata');
+                const response = await callFunctionWithBackoff(processImageForMetadata, {
+                    base64Image: base64Image.split(',')[1], // Remove MIME type prefix
+                    imageMimeType: file.type
+                }, 3, 1000);
+                
+                processFunctionResponse(response, 'AI Analysis');
+
+            } catch (error) {
+                console.error("AI Analysis Function Call Error:", error);
+                displayError(`Image Analysis Failed: ${error.message}. Check console for details.`);
+            } finally {
+                setLoading(false, 'ai');
+            }
+        }
+        
+        // --- GENERIC HELPERS ---
+
+        // Generic function to process and display the result from any successful Cloud Function call
+        function processFunctionResponse(response, sourceName) {
+            if (response && response.data.status === 'success') {
+                const resultSource = response.data.metadata.details.imageSource;
+                displayMetadata(response.data.metadata, resultSource);
+            } else if (response) {
+                displayError(response.data.message || `An unknown error occurred during ${sourceName}.`);
+            }
+        }
+
+        // Implements exponential backoff for retries
+        async function callFunctionWithBackoff(callable, data, maxRetries, initialDelay) {
+            let response = null;
+            let delay = initialDelay;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    response = await callable(data);
+                    return response; 
+                } catch (error) {
+                    if (i < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; 
+                    } else {
+                        throw error; 
+                    }
+                }
+            }
+        }
+
+        // Converts a File object to a Base64 string (used for AI function payload)
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // --- UI UTILITIES ---
+
+        // Image Preview Handler
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            const imagePreview = document.getElementById('image-preview');
+            const imagePreviewContainer = document.getElementById('image-preview-container');
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreviewContainer.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                 imagePreviewContainer.classList.add('hidden');
+            }
+        }
+
+        function displayError(message) {
+            const statusMessage = document.getElementById('status-message');
+            const highlightButton = document.getElementById('highlight-button');
+            const resultsContent = document.getElementById('results-content');
+            
+            if (statusMessage) statusMessage.classList.add('hidden'); 
+            if (highlightButton) highlightButton.disabled = true;
+            
+            if (message) {
+                resultsContent.innerHTML = `<div class="p-4 rounded-lg bg-red-100 text-red-700 font-medium">${message}</div>`;
+            } else if (resultsContent.innerHTML.includes('red-100')) {
+                 resultsContent.innerHTML = '<p class="text-gray-500 italic">Metadata will appear here after a successful lookup.</p>';
+            }
+        }
+
+        function displayMetadata(metadata, source) {
+            const details = metadata.details;
+            const creators = metadata.creators;
+            const highlightButton = document.getElementById('highlight-button');
+            const resultsContent = document.getElementById('results-content');
+
+            if (highlightButton) highlightButton.disabled = false; 
+
+            // Helper to list creators
+            const formatCreators = (role) => creators[role] && creators[role].length > 0
+                ? `<span class="font-normal text-gray-600">${creators[role].join(', ')}</span>`
+                : `<span class="font-normal text-gray-400">N/A</span>`;
+
+            resultsContent.innerHTML = `
+                <div class="flex flex-col md:flex-row gap-6">
+                    <!-- Image -->
+                    <div class="md:w-1/3">
+                        <img src="${details.image_url}" alt="${details.series_title} #${details.issue_number}" 
+                             class="rounded-lg shadow-lg w-full h-auto object-cover" 
+                             onerror="this.onerror=null;this.src='https://placehold.co/200x300/e5e7eb/7f8c8d?text=No+Image';">
+                        <p class="text-xs text-gray-400 text-center mt-2">Source: ${source}</p>
+                    </div>
+                    <!-- Details -->
+                    <div class="md:w-2/3 space-y-3">
+                        <h3 class="text-2xl font-bold text-indigo-700">${details.series_title} #${details.issue_number}</h3>
+                        <p class="text-lg text-gray-800 font-semibold">${details.publisher_name}</p>
+                        
+                        <hr class="border-gray-100">
+
+                        <div class="text-sm">
+                            <p><span class="font-medium text-gray-700">Release:</span> ${details.release_date || 'N/A'}</p>
+                            <p><span class="font-medium text-gray-700">SKU Base:</span> ${details.base_sku || 'N/A'}</p>
+                            <p><span class="font-medium text-gray-700">Volume ID:</span> ${details.volume_id || 'N/A'}</p>
+                        </div>
+                        
+                        <hr class="border-gray-100">
+
+                        <div class="text-sm space-y-1">
+                            <p class="font-medium text-gray-700">Writer: ${formatCreators('writer')}</p>
+                            <p class="font-medium text-gray-700">Penciller: ${formatCreators('penciller')}</p>
+                            <p class="font-medium text-gray-700">Colorist: ${formatCreators('colorist')}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
